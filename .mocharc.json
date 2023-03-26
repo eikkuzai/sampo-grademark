@@ -1,0 +1,11 @@
+{
+    "recursive": true,
+    "require": ["source-map-support/register", "ts-node/register/transpile-only"],
+    "full-trace": true,
+    "extension": ["js", "ts"],
+    "spec": "src/test/**/*.test.ts",
+    "node-option": [
+        "experimental-specifier-resolution=node",
+        "loader=ts-node/esm"
+    ]
+}
