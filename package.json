@@ -1,5 +1,5 @@
 {
-    "name": "grademark-sampo",
+    "name": "sampo-grademark",
     "version": "1.0.0",
     "description": "Toolkit for algo trading and backtesting in JavaScript and TypeScript.",
     "main": "build/index.js",
@@ -22,7 +22,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/eikkuzai/grademark-sampo.git"
+        "url": "git+https://github.com/eikkuzai/sampo-grademark.git"
     },
     "keywords": [
         "trading",
@@ -35,10 +35,7 @@
     ],
     "author": "[ashley@codecapers.com.au, enorrback1@gmail.com]",
     "license": "MIT",
-    "bugs": {
-        "url": "https://github.com/eikkuzai/grademark-sampo/issues"
-    },
-    "homepage": "https://github.com/eikkuzai/grademark-sampo/#readme",
+    "homepage": "https://github.com/eikkuzai/sampo-grademark/#readme",
     "dependencies": {
         "CBuffer": "^2.2.0",
         "dayjs": "^1.8.36",
