@@ -48,3 +48,16 @@ export const getShortRealisedPnl = (closePrice: Decimal, entryPrice: Decimal, po
     const realisedPnl = entryPrice.minus(closePrice).times(positionSize).times(contractValue)
     return realisedPnl
 }
+
+// Long ROE% = (Exit Price - Entry Price) * leverage / Entry Price * 100
+export const getLongRoe = (exitPrice: Decimal, entryPrice: Decimal, leverage: Decimal) => {
+    const roe = exitPrice.minus(entryPrice).times(leverage).dividedBy(entryPrice).times(new Decimal(100))
+    return roe
+}
+
+// Short ROE% = (Entry Price - Exit Price) * leverage / Entry Price * 100
+export const getShortRoe = (exitPrice: Decimal, entryPrice: Decimal, leverage: Decimal) => {
+    const roe = entryPrice.minus(exitPrice).times(leverage).dividedBy(entryPrice).times(new Decimal(100))
+    return roe
+}
+
