@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { npDiff, npMean, npStd, sharpe } from "grademark-sampo/src/lib/metrics"
+import { npDiff, npMean, npStd, sharpe } from "../../lib/metrics";
 import { Decimal } from 'decimal.js'
 
 describe("metrics:sharpe", () => {
@@ -27,7 +27,7 @@ describe("metrics:sharpe", () => {
     it("sharpe() should convert npDiff() result into pct change", () => {
         const valuesCopy = [...sharpeTestValues]
         const withoutFirst = valuesCopy.slice(1);
-        const diff = npDiff(valuesCopy).map((d, i) => {
+        const diff = npDiff(valuesCopy).map((d: Decimal.Value, i: number) => {
             return new Decimal(d).dividedBy(withoutFirst[i]).toNumber();
         });
         const expected = [0.5, 0.5, -0.3333333333333333, -0.2, 0.5833333333333334, -0.043478260869565216, -0.35294117647058826, -0.3076923076923077, 0.59375, 0.1111111111111111, 0.11764705882352941]

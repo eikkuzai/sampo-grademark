@@ -3,7 +3,7 @@ import { IDataFrame, DataFrame } from 'data-forge';
 import { IStrategy, IBar, IPosition } from "..";
 import { assert } from "chai";
 import { IEnterPositionOptions, StrategyOptions, TradeDirection } from "./strategy";
-import { getLongRealisedPnl, getShortRealisedPnl, isObject } from "./utils";
+import { getLongRealisedPnl, getLongRoe, getShortRealisedPnl, isObject } from "./utils";
 const CBuffer = require('CBuffer');
 import Decimal from 'decimal.js';
 
@@ -19,8 +19,20 @@ export function asDecimal(n: number | string | Decimal): Decimal {
  */
 
 function updatePosition(position: IPosition, bar: IBar): void {
+    
     position.profit = asDecimal(bar.close).minus(position.entryPrice);
     position.profitPct = (position.profit.dividedBy(position.entryPrice)).times(100);
+
+    // Calculate profit differently if leverage was used
+    if (position.size !== undefined && position.strategy && position.strategy.leverage !== undefined) {
+        position.profit = position.direction === TradeDirection.Long ?
+        getLongRealisedPnl(bar.close, position.entryPrice, position.size, position.strategy.contractMultiplier) :
+        getShortRealisedPnl(bar.close, position.entryPrice, position.size, position.strategy.contractMultiplier)
+
+        position.profitPct = position.direction === TradeDirection.Long
+        ? getLongRoe(bar.close, position.entryPrice, position.strategy.leverage)
+        : getShortRealisedPnl(bar.close, position.entryPrice, position.size, position.strategy.contractMultiplier)
+    }
 
     if (position.curStopPrice !== undefined) {
         const unitRisk = position.direction === TradeDirection.Long
@@ -50,6 +62,8 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         rmultiple = profit.div(position.initialUnitRisk);
     }
 
+    let profitPct = profit.div(position.entryPrice).times(100);
+
     console.log("profit without size", profit);
 
     // Calculate profit differently if leverage was used
@@ -58,6 +72,10 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         getLongRealisedPnl(exitPrice, position.entryPrice, position.size, position.strategy.contractMultiplier) :
         getShortRealisedPnl(exitPrice, position.entryPrice, position.size, position.strategy.contractMultiplier)
         console.log("profit with size:" + profit)
+
+        profitPct = position.direction === TradeDirection.Long
+        ? getLongRoe(exitPrice, position.entryPrice, position.strategy.leverage)
+        : getShortRealisedPnl(exitPrice, position.entryPrice, position.size, position.strategy.contractMultiplier)
     }
 
     if (fees) {
@@ -79,7 +97,7 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         exitTime: new Date(exitTime),
         exitPrice: exitPrice,
         profit: profit,
-        profitPct: (profit.div(position.entryPrice)).times(100),
+        profitPct: profitPct,
         riskPct: position.initialRiskPct,
         riskSeries: position.riskSeries,
         rmultiple: rmultiple,
@@ -142,6 +160,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     const strategyOptions = options.strategyOptions;
     const initialCapital = strategyOptions.initialCapital;
 
+    // copy initial capital into workingCapital as decimal as we dont want to modify the original
     let workingCapital = asDecimal(initialCapital);
 
     if (!strategy.orderSize) {
@@ -244,9 +263,11 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     function closePosition(bar: InputBarT, exitPrice: Decimal, exitReason: string) {
         const trade = finalizePosition(openPosition!, bar.time, exitPrice, exitReason, fees);
         completedTrades.push(trade!);
-        workingCapital = workingCapital.plus(trade.profit);
+
+        workingCapital = workingCapital.plus(trade!.profit);
         console.log(trade.profit);
         console.log("updated working capital:", workingCapital);
+        
         // Reset to no open position;
         openPosition = null;
         positionStatus = PositionStatus.None;
@@ -303,6 +324,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
                     const usableUsdt = (orderSizeType.percentage.div(100)).times(workingCapital)
                     const priceOnEntry = openPosition.entryPrice
                     const leverage = strategyOptions.leverage
+
                     openPosition.size = asDecimal(Math.floor(usableUsdt.dividedBy(priceOnEntry.times(strategyOptions.contractMultiplier)).times(leverage).toNumber()))
                     console.log("usable usdt: " + usableUsdt)
                     console.log("Order size:" + openPosition.size)

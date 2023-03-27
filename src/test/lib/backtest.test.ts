@@ -5,7 +5,7 @@ import { IBar } from '../../lib/bar';
 import { IStrategy, EnterPositionFn, IEntryRuleArgs, ExitPositionFn, IExitRuleArgs, TradeDirection, StrategyOptions } from '../../lib/strategy';
 import * as moment from 'dayjs';
 import Decimal from 'decimal.js'
-import { getLongRealisedPnl } from 'grademark-sampo/src/lib/utils';
+import { getLongRealisedPnl, getLongRoe, getShortRoe } from '../../lib/utils'
 
 
 describe("backtest", () => {
@@ -16,11 +16,6 @@ describe("backtest", () => {
         symbol: 'XBTUSDTM',
         contractMultiplier: asDecimal(0.001)
     }
-
-    function round(value: Decimal.Value) {
-        return Decimal.round(asDecimal(value).times(100)).div(100)
-    }
-
 
     function makeDate(dateStr: string, fmt?: string): Date {
         return moment(dateStr, fmt || "YYYY/MM/DD").toDate();
@@ -317,9 +312,13 @@ describe("backtest", () => {
 
         const singleTrade = trades[0];
         const comparison = getLongRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size!, strategyOptions.contractMultiplier)
+        const comparisonRoe = singleTrade.direction === TradeDirection.Long ? 
+        getLongRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage) :
+        getShortRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage)
+        
         expect(singleTrade.exitTime).to.eql(makeDate("2018/10/23"));
         expect(singleTrade.profit).to.eql(comparison);
-        expect(singleTrade.profitPct).to.eql(comparison.div(singleTrade.entryPrice).times(100));
+        expect(singleTrade.profitPct).to.eql(comparisonRoe);
 
     });
     

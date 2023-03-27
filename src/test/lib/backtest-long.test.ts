@@ -6,7 +6,7 @@ import { IStrategy, EnterPositionFn, IEntryRuleArgs, ExitPositionFn, IExitRuleAr
 import * as moment from 'dayjs';
 import { asDecimal } from '../../lib/backtest';
 import Decimal from 'decimal.js'
-import { getLongRealisedPnl } from 'grademark-sampo/src/lib/utils';
+import { getLongRealisedPnl, getLongRoe } from '../../lib/utils';
 
 describe("backtest long", () => {
 
@@ -538,8 +538,9 @@ describe("backtest long", () => {
         const singleTrade = trades[0];
 
         const comparison = getLongRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size!, strategyOptions.contractMultiplier) 
+        const comparisonRoe = getLongRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage)
 
         expect(singleTrade.profit).to.eql(comparison);
-        expect(singleTrade.profitPct).to.eql(comparison.div(singleTrade.entryPrice).times(100));
+        expect(singleTrade.profitPct).to.eql(comparisonRoe);
     });
 });

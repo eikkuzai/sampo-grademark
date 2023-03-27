@@ -1,7 +1,6 @@
 import { assert, expect } from 'chai';
 import { monteCarlo } from '../../lib/monte-carlo';
 import { ITrade, backtest } from '../..';
-import { DataFrame } from 'data-forge';
 import Decimal from 'decimal.js'
 import { asDecimal } from '../../lib/backtest';
 

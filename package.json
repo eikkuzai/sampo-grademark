@@ -38,6 +38,7 @@
     "homepage": "https://github.com/eikkuzai/sampo-grademark/#readme",
     "dependencies": {
         "CBuffer": "^2.2.0",
+        "data-forge": "^1.10.0",
         "dayjs": "^1.8.36",
         "decimal.js": "^10.3.1",
         "mathjs": "^5.10.3",
@@ -52,7 +53,7 @@
         "@data-forge/serialization": "^1.0.1",
         "@types/chai": "4.1.6",
         "@types/mathjs": "^4.4.5",
-        "@types/mocha": "10.0.0",
+        "@types/mocha": "^10.0.1",
         "@types/node": "10.11.4",
         "chai": "4.2.0",
         "data-forge-fs": "0.0.8",

@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+/*import { expect } from 'chai';
 import { optimize } from '../../lib/optimize';
 import { IDataFrame } from 'data-forge';
 import { DataFrame } from 'data-forge';
@@ -6,7 +6,7 @@ import { IBar } from '../../lib/bar';
 import { IStrategy, EnterPositionFn, IEntryRuleArgs } from '../../lib/strategy';
 import { ITrade } from '../../lib/trade';
 import * as moment from 'dayjs';
-/*
+
 describe("optimize", () => {
 
     function makeDate(dateStr: string, fmt?: string): Date {

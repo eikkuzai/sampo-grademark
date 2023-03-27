@@ -6,7 +6,7 @@ import { IStrategy, EnterPositionFn, IEntryRuleArgs, ExitPositionFn, IExitRuleAr
 import * as moment from 'dayjs';
 import Decimal from 'decimal.js'
 import { asDecimal } from '../../lib/backtest';
-import { getLongRealisedPnl, getShortRealisedPnl } from 'grademark-sampo/src/lib/utils';
+import { getLongRealisedPnl, getLongRoe, getShortRealisedPnl, getShortRoe } from '../../lib/utils'
 
 describe("backtest short", () => {
 
@@ -15,10 +15,6 @@ describe("backtest short", () => {
         leverage: asDecimal(7),
         symbol: 'XBTUSDTM',
         contractMultiplier: asDecimal(0.001)
-    }
-
-    function round(value: Decimal.Value) {
-        return Decimal.round(asDecimal(value).times(100)).div(100)
     }
 
     function makeDate(dateStr: string, fmt?: string): Date {
@@ -77,6 +73,12 @@ describe("backtest short", () => {
     const shortStrategyWithUnconditionalEntryAndExit: IStrategy = {
         entryRule: unconditionalShortEntry,
         exitRule: unconditionalShortExit,
+        orderSize: () => {
+            return {
+                type: 'percentageOfEquity',
+                percentage: asDecimal(90)
+            }
+        }
     };
     
     const simpleInputSeries = makeDataSeries([
@@ -181,7 +183,7 @@ describe("backtest short", () => {
         
         const strategy: IStrategy = {
             entryRule: unconditionalShortEntry,
-            stopLoss: args => args.entryPrice.times((asDecimal(20).div(100)))
+            stopLoss: args => args.entryPrice.times((asDecimal(20).div(100))),
         };
 
         const inputSeries = makeDataSeries([
@@ -459,7 +461,13 @@ describe("backtest short", () => {
         
         const strategy: IStrategy = {
             entryRule: unconditionalShortEntry,
-            stopLoss: args => args.entryPrice.times(asDecimal(20).div(100))
+            stopLoss: args => args.entryPrice.times(asDecimal(20).div(100)),
+            orderSize: () => {
+                return {
+                    type: 'percentageOfEquity',
+                    percentage: asDecimal(90)
+                }
+            }
         };
 
         const inputSeries = makeDataSeries([
@@ -472,7 +480,11 @@ describe("backtest short", () => {
         expect(trades.length).to.eql(1);
 
         const singleTrade = trades[0];
-        expect(singleTrade.rmultiple).to.eql(asDecimal(1));
+        const initialUnitRisk = singleTrade.direction === TradeDirection.Long
+        ? asDecimal(singleTrade.entryPrice).minus(singleTrade.stopPrice!)
+        : singleTrade.stopPrice!.minus(singleTrade.entryPrice)
+
+        expect(singleTrade.rmultiple).to.eql(singleTrade.profit.div(initialUnitRisk));
     });
 
     it("computes rmultiple from initial risk and loss", () => {
@@ -517,7 +529,7 @@ describe("backtest short", () => {
 
         const singleTrade = trades[0];
 
-        const output = singleTrade.riskSeries!.map(risk => ({ time: risk.time, value: round(risk.value) }));
+        const output = singleTrade.riskSeries!.map(risk => ({ time: risk.time, value: risk.value }));
         expect(output).to.eql([
             {
                 time: makeDate("2018/10/21"),
@@ -568,7 +580,7 @@ describe("backtest short", () => {
 
         const singleTrade = trades[0];
 
-        const output = singleTrade.riskSeries!.map(risk => ({ time: risk.time, value: round(risk.value) }));
+        const output = singleTrade.riskSeries!.map(risk => ({ time: risk.time, value: risk.value }));
         expect(output).to.eql([
             {
                 time: makeDate("2018/10/21"),
@@ -608,22 +620,16 @@ describe("backtest short", () => {
         const trades = backtest(shortStrategyWithUnconditionalEntryAndExit, inputData, {strategyOptions});
         const singleTrade = trades[0];
 
-
-        let compareProfit = asDecimal(0)
-
-        if (singleTrade.size !== undefined && strategyOptions.leverage !== undefined) {
-            compareProfit = singleTrade.direction === TradeDirection.Long ?
-            getLongRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier) :
-            getShortRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
-
-        } else {
-             compareProfit = singleTrade.direction === TradeDirection.Long 
-            ? singleTrade.exitPrice.minus(singleTrade.entryPrice)
-            : singleTrade.entryPrice.minus(singleTrade.exitPrice)
-        }
+        const compareProfit = singleTrade.direction === TradeDirection.Long ?
+        getLongRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier) :
+        getShortRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
+        
+        const comparisonRoe = singleTrade.direction === TradeDirection.Long ? 
+        getLongRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage) :
+        getShortRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage)
 
         expect(singleTrade.profit).to.eql(compareProfit);
-        expect(singleTrade.profitPct).to.eql((compareProfit.div(singleTrade.entryPrice)).times(100));
+        expect(singleTrade.profitPct).to.eql(comparisonRoe);
     });
 
 });
