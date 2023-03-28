@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { TradeDirection } from "./strategy";
+import { StrategyOptions, TradeDirection } from "./strategy";
 
 /**
  * Represents a value at a particular time.
@@ -103,5 +103,5 @@ export interface ITrade {
     profitTarget?: Decimal;
     size?: Decimal;
     leverage?: Decimal;
-
+    strategy?: StrategyOptions
 }
