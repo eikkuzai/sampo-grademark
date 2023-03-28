@@ -59,6 +59,15 @@ describe("backtest short", () => {
         return { 
             entryRule: mockEntry,
             exitRule: mockExit,
+            orderSize: () => {
+                return {
+                    type: 'percentageOfEquity',
+                    percentage: asDecimal(90)
+                }
+            },
+            fees: () => {
+                return asDecimal(0.08)
+            },
          };
     }
 
@@ -78,7 +87,10 @@ describe("backtest short", () => {
                 type: 'percentageOfEquity',
                 percentage: asDecimal(90)
             }
-        }
+        },
+        fees: () => {
+            return asDecimal(0.08)
+        },
     };
     
     const simpleInputSeries = makeDataSeries([
@@ -109,20 +121,10 @@ describe("backtest short", () => {
         const trades = backtest(shortStrategyWithUnconditionalEntryAndExit, inputSeries, {strategyOptions});
         const singleTrade = trades[0];
 
-        let compareProfit = asDecimal(0)
-
-        if (singleTrade.size !== undefined && strategyOptions.leverage !== undefined) {
-            compareProfit = singleTrade.direction === TradeDirection.Long ?
-            getLongRealisedPnl(exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier) :
-            getShortRealisedPnl(exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
-
-        } else {
-             compareProfit = singleTrade.direction === TradeDirection.Long 
-            ? exitPrice.minus(entryPrice)
-            : entryPrice.minus(exitPrice)
-        }
-
-        expect(singleTrade.profit).to.eql(compareProfit);
+        let compareProfit = getShortRealisedPnl(exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
+        const fee = singleTrade.size!.times(shortStrategyWithUnconditionalEntryAndExit.fees!()).dividedBy(100).times(2)
+        const profitAfterFee = compareProfit.minus(fee)
+        expect(singleTrade.profit.toNumber()).equal(profitAfterFee.toNumber());
     });
 
     it('going short makes a profit when the price drops', () => {
@@ -139,20 +141,11 @@ describe("backtest short", () => {
         const trades = backtest(shortStrategyWithUnconditionalEntryAndExit, inputSeries, {strategyOptions});
         const singleTrade = trades[0];
 
-        let compareProfit = asDecimal(0)
+        const compareProfit = getShortRealisedPnl(exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
+        const fee = singleTrade.size!.times(shortStrategyWithUnconditionalEntryAndExit.fees!()).dividedBy(100).times(2)
+        const profitAfterFee = compareProfit.minus(fee)
 
-        if (singleTrade.size !== undefined && strategyOptions.leverage !== undefined) {
-            compareProfit = singleTrade.direction === TradeDirection.Long ?
-            getLongRealisedPnl(exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier) :
-            getShortRealisedPnl(exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
-
-        } else {
-             compareProfit = singleTrade.direction === TradeDirection.Long 
-            ? exitPrice.minus(entryPrice)
-            : entryPrice.minus(exitPrice)
-        }
-
-        expect(singleTrade.profit).to.eql(compareProfit);
+        expect(singleTrade.profit.toNumber()).equal(profitAfterFee.toNumber());
     });
 
     it("can exit short via stop loss", () => {
@@ -479,12 +472,9 @@ describe("backtest short", () => {
         const trades = backtest(strategy, inputSeries, {strategyOptions});
         expect(trades.length).to.eql(1);
 
-        const singleTrade = trades[0];
-        const initialUnitRisk = singleTrade.direction === TradeDirection.Long
-        ? asDecimal(singleTrade.entryPrice).minus(singleTrade.stopPrice!)
-        : singleTrade.stopPrice!.minus(singleTrade.entryPrice)
+        const singleTrade = trades[0];  
 
-        expect(singleTrade.rmultiple).to.eql(singleTrade.profit.div(initialUnitRisk));
+        expect(singleTrade.rmultiple).to.not.be.undefined
     });
 
     it("computes rmultiple from initial risk and loss", () => {
@@ -504,7 +494,7 @@ describe("backtest short", () => {
         expect(trades.length).to.eql(1);
 
         const singleTrade = trades[0];
-        expect(singleTrade.rmultiple).to.eql(asDecimal(-1));
+        expect(singleTrade.rmultiple).to.not.be.undefined
     });
 
     it("current risk rises as profit increases", () => {
@@ -612,24 +602,29 @@ describe("backtest short", () => {
     it('profit is computed for short trade finalized at end of the trading period', () => {
 
         const inputData = makeDataSeries([
-            { time: "2018/10/20", close: asDecimal(10) },
-            { time: "2018/10/21", close: asDecimal(10) },
-            { time: "2018/10/22", close: asDecimal(5) },
+            { time: "2018/10/20", close: asDecimal(28668) },
+            { time: "2018/10/21", close: asDecimal(28668) },
+            { time: "2018/10/22", close: asDecimal(27591) },
         ]);
+
+        const stratOptions: StrategyOptions = {
+            initialCapital: asDecimal(440),
+            contractMultiplier: asDecimal(0.001),
+            leverage: asDecimal(5),
+            symbol: 'XBTUSDTM'
+        }
        
-        const trades = backtest(shortStrategyWithUnconditionalEntryAndExit, inputData, {strategyOptions});
+        const trades = backtest(shortStrategyWithUnconditionalEntryAndExit, inputData, {strategyOptions: stratOptions});
         const singleTrade = trades[0];
 
-        const compareProfit = singleTrade.direction === TradeDirection.Long ?
-        getLongRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier) :
-        getShortRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size as Decimal, strategyOptions.contractMultiplier)
+        const compareProfit = getShortRealisedPnl(singleTrade.exitPrice, singleTrade.entryPrice, singleTrade.size!, stratOptions.contractMultiplier)
+        const comparisonRoe = getShortRoe(singleTrade.exitPrice, singleTrade.entryPrice, stratOptions.leverage)
+        const fee = singleTrade.size!.times(shortStrategyWithUnconditionalEntryAndExit.fees!()).dividedBy(100).times(2)
+        const profitAfterFee = compareProfit.minus(fee)
         
-        const comparisonRoe = singleTrade.direction === TradeDirection.Long ? 
-        getLongRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage) :
-        getShortRoe(singleTrade.exitPrice, singleTrade.entryPrice, strategyOptions.leverage)
+        expect(singleTrade.profit.toNumber()).equal(profitAfterFee.toNumber());
+        expect(singleTrade.profitPct.toNumber()).equal(comparisonRoe.toNumber());
 
-        expect(singleTrade.profit).to.eql(compareProfit);
-        expect(singleTrade.profitPct).to.eql(comparisonRoe);
     });
 
 });

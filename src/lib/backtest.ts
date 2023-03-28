@@ -2,8 +2,8 @@ import { ITrade } from "./trade";
 import { IDataFrame, DataFrame } from 'data-forge';
 import { IStrategy, IBar, IPosition } from "..";
 import { assert } from "chai";
-import { IEnterPositionOptions, StrategyOptions, TradeDirection } from "./strategy";
-import { getLongRealisedPnl, getLongRoe, getShortRealisedPnl, isObject } from "./utils";
+import { IEnterPositionOptions, OrderSizeType, StrategyOptions, TradeDirection } from "./strategy";
+import { getLongRealisedPnl, getLongRoe, getShortRealisedPnl, getShortRoe, isObject } from "./utils";
 const CBuffer = require('CBuffer');
 import Decimal from 'decimal.js';
 
@@ -31,7 +31,7 @@ function updatePosition(position: IPosition, bar: IBar): void {
 
         position.profitPct = position.direction === TradeDirection.Long
         ? getLongRoe(bar.close, position.entryPrice, position.strategy.leverage)
-        : getShortRealisedPnl(bar.close, position.entryPrice, position.size, position.strategy.contractMultiplier)
+        : getShortRoe(bar.close, position.entryPrice, position.strategy.leverage)
     }
 
     if (position.curStopPrice !== undefined) {
@@ -52,7 +52,7 @@ function updatePosition(position: IPosition, bar: IBar): void {
  * @param exitTime The timestamp for the bar when the position was exited.
  * @param exitPrice The price of the instrument when the position was exited.
  */
-function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decimal, exitReason: string, fees: Decimal): ITrade {
+function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decimal, exitReason: string, fees?: Decimal): ITrade {
     
     let profit = position.direction === TradeDirection.Long 
         ? exitPrice.minus(position.entryPrice)
@@ -65,6 +65,7 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
     let profitPct = profit.div(position.entryPrice).times(100);
 
     console.log("profit without size", profit);
+    console.log("profit pct without size", profitPct);
 
     // Calculate profit differently if leverage was used
     if (position.size !== undefined && position.strategy && position.strategy.leverage !== undefined) {
@@ -75,7 +76,9 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
 
         profitPct = position.direction === TradeDirection.Long
         ? getLongRoe(exitPrice, position.entryPrice, position.strategy.leverage)
-        : getShortRealisedPnl(exitPrice, position.entryPrice, position.size, position.strategy.contractMultiplier)
+        : getShortRoe(exitPrice, position.entryPrice, position.strategy.leverage)
+
+        console.log("profit pct with size:" + profitPct)
     }
 
     if (fees) {
@@ -107,7 +110,8 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         stopPriceSeries: position.stopPriceSeries,
         profitTarget: position.profitTarget,
         leverage: position.strategy ? position.strategy.leverage : asDecimal(1),
-        size: position.size
+        size: position.size,
+        strategy: position.strategy
     };
 }
 
@@ -164,13 +168,10 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     let workingCapital = asDecimal(initialCapital);
 
     if (!strategy.orderSize) {
-        console.warn("Backtest strategy has no order size fn specified. Default to 90% of equity");
+        console.warn("Backtest strategy has no order size fn specified.");
     }
 
-    const orderSizeType = strategy.orderSize ? strategy.orderSize() : {
-        type: 'percentageOfEquity',
-        percentage: asDecimal(90)
-    }
+    const orderSizeType: OrderSizeType = strategy.orderSize ? strategy.orderSize() : { type: "percentageOfEquity", percentage: asDecimal(90) };
 
     if (inputSeries.none()) {
         throw new Error("Expect input data series to contain at last 1 bar.");
@@ -201,7 +202,8 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     //
     // Sum of maker fee and taker fee.
     //
-    const fees = strategy.fees ? asDecimal(strategy.fees()) : asDecimal(0)
+    const fees = strategy.fees ? strategy.fees() : undefined;
+    console.warn("Fee fn not found on strategy, fees will be undefined");
 
     //
     // Tracks trades that have been closed.
@@ -320,14 +322,20 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
                     strategy: strategyOptions
                 };
 
+                console.log("fees used: " + fees)
+
                 if (orderSizeType.type === "percentageOfEquity") {
-                    const usableUsdt = (orderSizeType.percentage.div(100)).times(workingCapital)
-                    const priceOnEntry = openPosition.entryPrice
+
+                    const usableUsdt = workingCapital.times(orderSizeType.percentage.dividedBy(100));
                     const leverage = strategyOptions.leverage
 
-                    openPosition.size = asDecimal(Math.floor(usableUsdt.dividedBy(priceOnEntry.times(strategyOptions.contractMultiplier)).times(leverage).toNumber()))
+                    openPosition.size = asDecimal(Math.floor(usableUsdt.dividedBy(entryPrice.times(strategyOptions.contractMultiplier)).times(leverage).toNumber()))
                     console.log("usable usdt: " + usableUsdt)
                     console.log("Order size:" + openPosition.size)
+                    console.log("price on entry: " + entryPrice)
+                    console.log("leverage: " + leverage)
+                    console.log("contract multiplier: " + strategyOptions.contractMultiplier)
+
                 }
 
                 if (strategy.stopLoss) {
@@ -504,7 +512,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
             case PositionStatus.Exit:
                 assert(openPosition !== null, "Expected open position to already be initialised!");
 
-                closePosition(bar, asDecimal(bar.open), "exit-rule");
+                closePosition(bar, bar.open, "exit-rule");
                 break;
                 
             default:
@@ -515,7 +523,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     if (openPosition) {
         // Finalize open position.
         const lastBar = indicatorsSeries.last();
-        const lastTrade = finalizePosition(openPosition, lastBar.time, asDecimal(lastBar.close), "finalize", fees);
+        const lastTrade = finalizePosition(openPosition, lastBar.time, lastBar.close, "finalize", fees);
         completedTrades.push(lastTrade);
     }
 
