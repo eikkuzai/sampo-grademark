@@ -20,25 +20,26 @@ export function asDecimal(n: number | string | Decimal): Decimal {
 
 function updatePosition(position: IPosition, bar: IBar): void {
     
-    position.profit = asDecimal(bar.close).minus(position.entryPrice);
+    const closePrice = asDecimal(bar.close);
+    position.profit = closePrice.minus(position.entryPrice);
     position.profitPct = (position.profit.dividedBy(position.entryPrice)).times(100);
 
     // Calculate profit differently if leverage was used
     if (position.size !== undefined && position.strategy && position.strategy.leverage !== undefined) {
         position.profit = position.direction === TradeDirection.Long ?
-        getLongRealisedPnl(bar.close, position.entryPrice, position.size, position.strategy.contractMultiplier) :
-        getShortRealisedPnl(bar.close, position.entryPrice, position.size, position.strategy.contractMultiplier)
+        getLongRealisedPnl(closePrice, position.entryPrice, position.size, position.strategy.contractMultiplier) :
+        getShortRealisedPnl(closePrice, position.entryPrice, position.size, position.strategy.contractMultiplier)
 
         position.profitPct = position.direction === TradeDirection.Long
-        ? getLongRoe(bar.close, position.entryPrice, position.strategy.leverage)
-        : getShortRoe(bar.close, position.entryPrice, position.strategy.leverage)
+        ? getLongRoe(closePrice, position.entryPrice, position.strategy.leverage)
+        : getShortRoe(closePrice, position.entryPrice, position.strategy.leverage)
     }
 
     if (position.curStopPrice !== undefined) {
         const unitRisk = position.direction === TradeDirection.Long
-            ? asDecimal(bar.close).minus(position.curStopPrice)
-            : position.curStopPrice.minus(bar.close);
-        position.curRiskPct = (unitRisk.div(bar.close)).times(100);
+            ? closePrice.minus(position.curStopPrice)
+            : position.curStopPrice.minus(closePrice);
+        position.curRiskPct = (unitRisk.div(closePrice)).times(100);
         position.curRMultiple = position.profit.div(unitRisk);
     }
 
