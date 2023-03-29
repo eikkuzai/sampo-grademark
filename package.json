@@ -1,6 +1,6 @@
 {
     "name": "sampo-grademark",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "Toolkit for algo trading and backtesting in JavaScript and TypeScript.",
     "main": "build/index.js",
     "types": "build/index.d.ts",

@@ -329,7 +329,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
                     const usableUsdt = workingCapital.times(orderSizeType.percentage.dividedBy(100));
                     const leverage = strategyOptions.leverage
 
-                    openPosition.size = asDecimal(Math.floor(usableUsdt.dividedBy(entryPrice.times(strategyOptions.contractMultiplier)).times(leverage).toNumber()))
+                    openPosition.size = asDecimal(Math.floor(usableUsdt.dividedBy(openPosition.entryPrice.times(strategyOptions.contractMultiplier)).times(leverage).toNumber()))
                     console.log("usable usdt: " + usableUsdt)
                     console.log("Order size:" + openPosition.size)
                     console.log("price on entry: " + entryPrice)
