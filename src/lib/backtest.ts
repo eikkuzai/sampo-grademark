@@ -204,7 +204,9 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     // Sum of maker fee and taker fee.
     //
     const fees = strategy.fees ? strategy.fees() : undefined;
-    console.warn("Fee fn not found on strategy, fees will be undefined");
+    if (!fees) {
+        console.warn("Fee fn not found on strategy, fees will be undefined");
+    }
 
     //
     // Tracks trades that have been closed.
@@ -513,7 +515,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
             case PositionStatus.Exit:
                 assert(openPosition !== null, "Expected open position to already be initialised!");
 
-                closePosition(bar, bar.open, "exit-rule");
+                closePosition(bar, asDecimal(bar.open), "exit-rule");
                 break;
                 
             default:
