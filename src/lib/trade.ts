@@ -103,5 +103,5 @@ export interface ITrade {
     profitTarget?: Decimal;
     size?: Decimal;
     leverage?: Decimal;
-    strategy?: StrategyOptions
+    strategy?: string;
 }

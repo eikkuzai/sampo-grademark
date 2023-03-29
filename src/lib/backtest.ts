@@ -112,7 +112,7 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         profitTarget: position.profitTarget,
         leverage: position.strategy ? position.strategy.leverage : asDecimal(1),
         size: position.size,
-        strategy: position.strategy
+        strategy: JSON.stringify(position.strategy)
     };
 }
 
