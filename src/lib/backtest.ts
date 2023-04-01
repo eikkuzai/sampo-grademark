@@ -53,7 +53,7 @@ function updatePosition(position: IPosition, bar: IBar): void {
  * @param exitTime The timestamp for the bar when the position was exited.
  * @param exitPrice The price of the instrument when the position was exited.
  */
-function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decimal, exitReason: string, fees?: Decimal): ITrade {
+function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decimal, exitReason: string | string[] | undefined, fees?: Decimal): ITrade {
     
     let profit = position.direction === TradeDirection.Long 
         ? exitPrice.minus(position.entryPrice)
@@ -231,6 +231,9 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     // Reason for entering
     let entryReason: string[] | string | undefined;
 
+    // Reason for exiting (if any)
+    let strategyExitReason: string[] | string | undefined;
+
     //
     // Tracks the currently open position, or set to null when there is no open position.
     //
@@ -256,16 +259,17 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
     /**
      * User calls this function to exit a position on the instrument.
      */
-    function exitPosition() {
+    function exitPosition(exitReason?: string) {
         assert(positionStatus === PositionStatus.Position, "Can only exit a position when we are in a position.");
 
         positionStatus = PositionStatus.Exit; // Exit position next bar.
+        strategyExitReason = exitReason; // TODO: use this
     }
 
     //
     // Close the current open position.
     //
-    function closePosition(bar: InputBarT, exitPrice: Decimal, exitReason: string) {
+    function closePosition(bar: InputBarT, exitPrice: Decimal, exitReason?: string | string[] | undefined) {
         const trade = finalizePosition(openPosition!, bar.time, exitPrice, exitReason, fees);
         completedTrades.push(trade!);
 
@@ -515,7 +519,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
             case PositionStatus.Exit:
                 assert(openPosition !== null, "Expected open position to already be initialised!");
 
-                closePosition(bar, asDecimal(bar.open), "exit-rule");
+                closePosition(bar, asDecimal(bar.open), strategyExitReason ? strategyExitReason : "exit-rule");
                 break;
                 
             default:
