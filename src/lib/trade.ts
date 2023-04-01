@@ -85,7 +85,7 @@ export interface ITrade {
     /**
      * The reason the position was exited.
      */
-    exitReason: string;
+    exitReason: string | string[] | undefined;
 
     /**
      * Price where stop loss exit is triggered.

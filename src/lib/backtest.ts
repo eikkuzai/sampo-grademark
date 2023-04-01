@@ -263,7 +263,7 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
         assert(positionStatus === PositionStatus.Position, "Can only exit a position when we are in a position.");
 
         positionStatus = PositionStatus.Exit; // Exit position next bar.
-        strategyExitReason = exitReason; // TODO: use this
+        strategyExitReason = exitReason; 
     }
 
     //
