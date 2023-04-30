@@ -57,6 +57,15 @@ function updatePosition(position: IPosition, bar: IBar): void {
  */
 function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decimal, exitReason: string | string[] | undefined, fees?: Decimal): ITrade {
     
+    // Calculate slippage adjusted exitPrice
+    console.log("exitPrice without slippage:" + exitPrice)
+    const isLong = position.direction == TradeDirection.Long
+    const exitSlippage = slippage?.exit(exitPrice,isLong).computedPrice
+    const exitPriceWithSlippage = exitPrice.plus(exitSlippage!);
+  
+    exitPrice = exitPriceWithSlippage;
+    console.log("exitPrice with slippage:" + exitPrice) 
+
     let profit = position.direction === TradeDirection.Long 
         ? exitPrice.minus(position.entryPrice)
         : position.entryPrice.minus(exitPrice)
@@ -323,7 +332,18 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
                     }
                 }
 
-                const entryPrice = bar.open;
+                // Take entry price first from bar open
+                let entryPrice = bar.open;
+                
+                // Calculate slippage adjusted entryPrice
+                console.log("entryPrice without slippage:" + entryPrice)
+
+                const isLong = positionDirection == TradeDirection.Long
+                const entrySlippage = slippage?.entry(entryPrice, isLong).computedPrice
+                const entryPriceWithSlippage = entryPrice.plus(entrySlippage!);
+            
+                entryPrice = entryPriceWithSlippage;
+                console.log("entryPrice with slippage:" + entryPrice) 
 
                 openPosition = {
                     direction: positionDirection,
