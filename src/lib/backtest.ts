@@ -84,35 +84,16 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         console.log("profit pct with size:" + profitPct)
     }
 
-    let totalFees = asDecimal(0)
     if (fees) {
         // Simulate fees (only using entry price because i cba.. realistically the fee would differ on entry and exit)
         // Order size - 0.08%
         const orderSize = position.size
 
         // Entry and exit order both take fees so thats why times 2 -.-
-        totalFees = orderSize.times(fees).dividedBy(100).times(2)
+        const fee = orderSize.times(fees).dividedBy(100).times(2)
+        profit = profit.minus(fee)   
+        console.log("profit after fees:" + profit)
     }
-
-    // Consider slippage
-    const isLong = position.direction == TradeDirection.Long
-    const entrySlippage = slippage?.entry(position.entryPrice, isLong).computedPrice
-    const exitSlippage = slippage?.exit(exitPrice, isLong).computedPrice
-
-    const slippageAdjustedExitPrice = exitPrice.minus(exitSlippage!)
-    const slippageAdjustedEntryPrice = position.entryPrice.plus(entrySlippage!)
-    
-    const slippageAdjustedTradeProfit = slippageAdjustedExitPrice
-    .minus(slippageAdjustedEntryPrice)
-    .times(position.size)
-    .times(isLong ? 1 : -1);
-
-    console.log("profit before slippage and fees:" + profit)
-
-    // calculate total profit with slippage and fees
-    const slippageAdjustedTotalProfit = slippageAdjustedTradeProfit.minus(totalFees); 
-    profit = slippageAdjustedTotalProfit
-    console.log("profit after slippage and fees:" + profit)
 
     return {
         direction: position.direction,
