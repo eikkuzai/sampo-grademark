@@ -1,5 +1,6 @@
 const t = require('typy').default;
 import Decimal from 'decimal.js'
+import { SlippageFn } from './strategy';
 
 //
 // Various shared utility functions.
@@ -59,5 +60,25 @@ export const getLongRoe = (exitPrice: Decimal, entryPrice: Decimal, leverage: De
 export const getShortRoe = (exitPrice: Decimal, entryPrice: Decimal, leverage: Decimal) => {
     const roe = entryPrice.minus(exitPrice).times(leverage).dividedBy(entryPrice).times(new Decimal(100))
     return roe
+}
+
+export function fixedSlippage(slippageAmount: Decimal): SlippageFn {
+    return (price: Decimal, isLong: boolean) => {
+        const sign = isLong ? 1 : -1;
+        return {type: "FIXED", computedPrice: price.plus(slippageAmount.times(sign))}
+    };
+}
+
+export function noSlippage(): SlippageFn {
+    return (price: Decimal, isLong: boolean) => {
+        return {type: "NONE", computedPrice: price}
+    }
+}
+  
+export function percentageSlippage(slippagePercent: Decimal): SlippageFn {
+    return (price: Decimal, isLong: boolean) => {
+        const sign = isLong ? 1 : -1;
+        return {type: "PERCENTAGE", computedPrice: price.times(slippagePercent.plus(1).times(sign))}
+    };
 }
 

@@ -108,6 +108,14 @@ export interface OrderSizeType {
  */
 export type FeesFn = () => Decimal;
 
+export type SlippageType = "FIXED" | "PERCENTAGE" | "NONE"
+
+/**
+ * Computes the slippage. 
+ * Percentage or fixed value, different settings for entries and exits.
+ */
+export type SlippageFn = (price: Decimal, isLong: boolean) => {type: SlippageType, computedPrice: Decimal};
+
 export type OrderSizeFn = () => OrderSizeType;
 
 /**
@@ -238,6 +246,14 @@ export interface IStrategy<InputBarT extends IBar = IBar, IndicatorsBarT extends
      * Return the sum of maker fee and taker fee.
      */
     fees?: FeesFn;
+
+    /**
+     * Function that computes the slippage
+     */
+    slippage?: {
+        entry: SlippageFn,
+        exit: SlippageFn
+    };
 
     /**
      * Function that defines the orderSize calculation type

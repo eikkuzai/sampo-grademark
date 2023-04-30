@@ -2,14 +2,16 @@ import { ITrade } from "./trade";
 import { IDataFrame, DataFrame } from 'data-forge';
 import { IStrategy, IBar, IPosition } from "..";
 import { assert } from "chai";
-import { IEnterPositionOptions, OrderSizeType, StrategyOptions, TradeDirection } from "./strategy";
-import { getLongRealisedPnl, getLongRoe, getShortRealisedPnl, getShortRoe, isObject } from "./utils";
+import { IEnterPositionOptions, OrderSizeType, SlippageFn, StrategyOptions, TradeDirection } from "./strategy";
+import { getLongRealisedPnl, getLongRoe, getShortRealisedPnl, getShortRoe, isObject, noSlippage } from "./utils";
 const CBuffer = require('CBuffer');
 import Decimal from 'decimal.js';
 
 export function asDecimal(n: number | string | Decimal): Decimal {
     return new Decimal(n);
 }
+
+let slippage: {entry: SlippageFn, exit: SlippageFn} | null = null
 
 /**
  * Update an open position for a new bar.
@@ -82,16 +84,35 @@ function finalizePosition(position: IPosition, exitTime: Date, exitPrice: Decima
         console.log("profit pct with size:" + profitPct)
     }
 
+    let totalFees = asDecimal(0)
     if (fees) {
         // Simulate fees (only using entry price because i cba.. realistically the fee would differ on entry and exit)
         // Order size - 0.08%
         const orderSize = position.size
 
         // Entry and exit order both take fees so thats why times 2 -.-
-        const fee = orderSize.times(fees).dividedBy(100).times(2)
-        profit = profit.minus(fee)   
-        console.log("profit after fees:" + profit)
+        totalFees = orderSize.times(fees).dividedBy(100).times(2)
     }
+
+    // Consider slippage
+    const isLong = position.direction == TradeDirection.Long
+    const entrySlippage = slippage?.entry(position.entryPrice, isLong).computedPrice
+    const exitSlippage = slippage?.exit(exitPrice, isLong).computedPrice
+
+    const slippageAdjustedExitPrice = exitPrice.minus(exitSlippage!)
+    const slippageAdjustedEntryPrice = position.entryPrice.plus(entrySlippage!)
+    
+    const slippageAdjustedTradeProfit = slippageAdjustedExitPrice
+    .minus(slippageAdjustedEntryPrice)
+    .times(position.size)
+    .times(isLong ? 1 : -1);
+
+    console.log("profit before slippage and fees:" + profit)
+
+    // calculate total profit with slippage and fees
+    const slippageAdjustedTotalProfit = slippageAdjustedTradeProfit.minus(totalFees); 
+    profit = slippageAdjustedTotalProfit
+    console.log("profit after slippage and fees:" + profit)
 
     return {
         direction: position.direction,
@@ -167,6 +188,12 @@ export function backtest<InputBarT extends IBar, IndicatorBarT extends InputBarT
 
     // copy initial capital into workingCapital as decimal as we dont want to modify the original
     let workingCapital = asDecimal(initialCapital);
+
+    // slippage setup
+    slippage = {
+        entry: strategy.slippage?.entry || noSlippage(),
+        exit: strategy.slippage?.exit || noSlippage()
+    }
 
     if (!strategy.orderSize) {
         console.warn("Backtest strategy has no order size fn specified.");
